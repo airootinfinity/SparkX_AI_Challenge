@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+"""Generate all practice worlds listed in config/practice_worlds.yaml.
+usage: make_practice_worlds [out_dir] [config.yaml]"""
+import os
+import sys
+
+import yaml
+
+from sparkx_worlds.generator import generate
+
+if __name__ == '__main__':
+    here = os.path.dirname(os.path.abspath(__file__))
+    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, '..', 'worlds')
+    cfg = sys.argv[2] if len(sys.argv) > 2 else os.path.join(here, '..', 'config', 'practice_worlds.yaml')
+    if not os.path.exists(cfg):
+        from ament_index_python.packages import get_package_share_directory
+        cfg = os.path.join(get_package_share_directory('sparkx_worlds'), 'config', 'practice_worlds.yaml')
+    for w in yaml.safe_load(open(cfg))['worlds']:
+        generate(w['name'], w['seed'], w['size'], w['difficulty'], w['lighting'], os.path.abspath(out))

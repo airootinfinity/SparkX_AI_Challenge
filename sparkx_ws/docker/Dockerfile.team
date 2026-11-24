@@ -1,0 +1,23 @@
+# SparkX Disaster Response Challenge - TEAM image: the pristine organiser stack + one team's submission.
+#
+#   docker build -t sparkx_team_<name> -f docker/Dockerfile.team \
+#       --build-arg SUBMISSION=<name>_submission.zip <folder containing the zip>
+#
+# (docker/run_team.sh does this for you.) The archive is validated by tools/sparkx_lock.py: it may
+# contain only the files listed in TEAM_FILES.txt. Anything else fails the build, so nothing a team
+# changed outside its four files can reach the competition run.
+ARG BASE=sparkx:latest
+FROM ${BASE}
+ARG SUBMISSION=submission.zip
+COPY ${SUBMISSION} /tmp/submission.zip
+RUN python3 /sparkx_ws/tools/sparkx_lock.py load /tmp/submission.zip --into /sparkx_ws \
+ && python3 /sparkx_ws/tools/sparkx_lock.py verify \
+ && rm /tmp/submission.zip \
+ && . /opt/ros/jazzy/setup.sh && cd /sparkx_ws && colcon build --packages-select sparkx_team \
+ && useradd --create-home --shell /bin/bash team \
+ && chmod -R a-w /sparkx_ws/src /sparkx_ws/install
+# Team code runs unprivileged and cannot rewrite the stack inside its own container.
+USER team
+WORKDIR /home/team
+# Autonomy only: no simulator, no referee, no ground truth in this container.
+CMD ["ros2", "launch", "sparkx_baseline", "baseline.launch.py"]

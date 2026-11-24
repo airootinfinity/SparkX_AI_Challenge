@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SparkX Host</title>
+<style>
+:root{--bg:#f4f4f6;--card:#fff;--ink:#1b1d2a;--mute:#6b6f80;--line:#dcdde4;--accent:#e50227;--ok:#16794a;--bad:#b3261e;--navy:#242860;--code:#f0f0f4}
+@media (prefers-color-scheme: dark){:root{--bg:#14151c;--card:#1d1f2a;--ink:#ececf2;--mute:#9a9eb2;--line:#34374a;--ok:#5fd39a;--bad:#ff8a80;--navy:#aab0ff;--code:#12131a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+@media (prefers-color-scheme: dark){header{background:#1d1f2a;border-bottom:1px solid var(--line)}}
+.partners{background:#1d1d1f;padding:6px 12px;text-align:center;color:#f0eff2;font-size:13px}
+.partners img{height:52px;max-width:100%;object-fit:contain;display:inline-block;vertical-align:middle}
+header h1{font-size:18px;margin:0;letter-spacing:.02em}
+header span{opacity:.8;font-size:13px}
+main{max-width:1180px;margin:0 auto;padding:16px;display:grid;gap:16px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);margin:0 0 12px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--mute);font-weight:600}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.wrap{overflow-x:auto}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 14px;border-radius:7px;cursor:pointer}
+button.go{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button:disabled{opacity:.45;cursor:not-allowed}
+select{font:inherit;padding:7px 10px;border-radius:7px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}.mute{color:var(--mute)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:10px 0}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.kpi .l{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.kpi .v{font-size:22px;font-weight:650;font-variant-numeric:tabular-nums}
+pre{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:10px;margin:0;max-height:300px;overflow:auto;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap}
+.stage{font-size:18px;font-weight:650}
+.warn{border-left:4px solid var(--accent);padding:8px 12px;background:var(--code);border-radius:4px;margin-bottom:12px}
+small{color:var(--mute)}
+a{color:inherit}
+</style>
+</head>
+<body>
+<div class="partners"><img src="/brand/header.png" alt="IIIT Allahabad | STEMLearn.AI | Airoot | Presented at IIT Bombay Techfest"
+ onerror="this.replaceWith(document.createTextNode('IIIT Allahabad · STEMLearn.AI · Airoot · Presented at IIT Bombay Techfest'))"></div>
+<header><h1>SparkX Host</h1><span>submissions &rarr; clean build &rarr; scored run</span></header>
+<main>
+ <section>
+  <h2>Now</h2>
+  <div id="warn"></div>
+  <div class="stage" id="stage">-</div>
+  <div class="kpis" id="kpis"></div>
+  <div class="bar"><button id="stop" onclick="post('/api/stop',{})">Stop run and clear queue</button><span id="dash"></span><span class="mute" id="queue"></span></div>
+  <pre id="log"></pre>
+ </section>
+ <section>
+  <h2>Submissions <small>(zips in hosting/submissions)</small></h2>
+  <div class="bar">
+   <label>World <select id="world"></select></label>
+   <label><input type="checkbox" id="gui"> show the Gazebo window</label>
+   <button onclick="runOne('*')" id="all">Run every accepted team on this world</button>
+  </div>
+  <div class="wrap"><table><thead><tr><th>Team</th><th>File</th><th>Received</th><th>Check</th><th>Runs so far</th><th></th></tr></thead><tbody id="subs"></tbody></table></div>
+ </section>
+ <section>
+  <h2>Leaderboard <small>(best run per world, added up)</small></h2>
+  <div class="wrap"><table><thead id="bh"></thead><tbody id="board"></tbody></table></div>
+ </section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c]));
+// the panel key: printed by "sparkx_host.py ui" as part of the address (?key=...); every API call carries it
+let KEY='';try{KEY=new URLSearchParams(location.search).get('key')||sessionStorage.getItem('sparkx_panel_key')||'';sessionStorage.setItem('sparkx_panel_key',KEY)}catch(e){}
+const H={'X-Panel-Key':KEY};
+const fmt=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+let worldsKey='';
+async function post(u,b){const r=await fetch(u,{method:'POST',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify(b)});
+ const j=await r.json();if(j.error)alert(j.error);tick()}
+function runOne(z){const w=$('world').value;if(!w){alert('No world available.');return}
+ if(z==='*'&&!confirm('Run every accepted submission on '+w+', one after another?'))return;
+ post('/api/run',{zip:z,world:w,gui:$('gui').checked})}
+async function tick(){
+ let s,r;try{r=await fetch('/api/state',{headers:H});s=await r.json()}catch(e){$('stage').textContent='control panel is not answering';return}
+ if(r.status===403){$('stage').textContent='Open the address that "sparkx_host.py ui" printed (it ends with ?key=...).';return}
+ const j=s.job,busy=!['idle','finished','failed'].includes(j.stage);
+ $('warn').innerHTML=(s.stack?'':'<div class="warn">The organiser stack is not built yet. Run <b>python3 hosting/sparkx_host.py setup</b> once.</div>')+
+  (s.sandbox?'':'<div class="warn">No sandbox on this machine (bubblewrap missing or switched off): team software could read the answer files.</div>');
+ $('stage').innerHTML=j.stage==='idle'?'Idle':esc(j.team)+' on '+esc(j.world)+' &mdash; <span class="'+(j.stage==='failed'?'bad':j.stage==='finished'?'ok':'')+'">'+esc(j.stage)+'</span>';
+ const m=j.mission,r=j.result;let k='';
+ if(m){k=[['Mission clock',fmt(m.elapsed)+' / '+fmt(m.time_limit)],['Score',m.score],['Rescued',m.rescued+(m.total?' / '+m.total:'')],
+  ['Clues',m.hints],['Collisions',m.collisions],['Late reports',m.late_reports??0],['Idle penalties',m.idle_penalties??0],['Health',Math.round(m.health)+'%']]
+  .map(x=>`<div class="kpi"><div class="l">${x[0]}</div><div class="v">${esc(x[1])}</div></div>`).join('');
+  if(m.behavior)k+=`<div class="kpi" style="grid-column:span 2"><div class="l">Rover is doing</div><div>${esc(m.behavior.state)} ${esc(m.behavior.detail)}</div></div>`}
+ if(r)k+=`<div class="kpi" style="grid-column:span 2"><div class="l">Official result</div><div class="v">${r.official_score} pts &middot; ${r.rescued.length}/${r.survivors_total}</div><div class="mute">${esc(r.finish_reason)}</div></div>`;
+ $('kpis').innerHTML=k;
+ $('dash').innerHTML=j.dashboard?`<a href="${esc(j.dashboard)}" target="_blank">open the referee dashboard (live map)</a>`:'';
+ $('queue').textContent=s.queue.length?'waiting: '+s.queue.map(q=>q.zip+' on '+q.world).join(', '):'';
+ $('stop').disabled=!busy&&!s.queue.length;
+ const lg=$('log'),atEnd=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-8;lg.textContent=(j.error?'ERROR: '+j.error+'\n\n':'')+j.log.join('\n');if(atEnd)lg.scrollTop=lg.scrollHeight;
+ const wk=s.worlds.map(w=>w.name).join('|');
+ if(wk!==worldsKey){worldsKey=wk;const cur=$('world').value;$('world').innerHTML=s.worlds.map(w=>`<option value="${esc(w.name)}">${esc(w.name)} (${w.kind})</option>`).join('');if(cur)$('world').value=cur}
+ $('subs').innerHTML=s.submissions.map(x=>`<tr><td><b>${esc(x.team)}</b></td><td>${esc(x.zip)}</td><td>${esc(x.received)}</td>
+  <td>${x.problems.length?'<span class="bad">rejected</span><br><small>'+x.problems.map(esc).join('<br>')+'</small>':'<span class="ok">accepted</span>'}</td>
+  <td>${x.runs.map(r=>esc(r.world)+': <b>'+r.score+'</b> ('+r.rescued+'/'+r.total+')').join('<br>')||'<span class="mute">none</span>'}</td>
+  <td><button class="go" ${x.problems.length?'disabled':''} data-zip="${esc(x.zip)}" onclick="runOne(this.dataset.zip)">Build &amp; run</button></td></tr>`).join('')||
+  '<tr><td colspan="6" class="mute">No zip files yet. Copy the teams\' zips into hosting/submissions.</td></tr>';
+ $('all').disabled=!s.submissions.some(x=>!x.problems.length);
+ const names=[...new Set(s.board.flatMap(t=>Object.keys(t.worlds)))].sort();
+ $('bh').innerHTML='<tr><th>#</th><th>Team</th><th class="num">Total</th><th class="num">Rescued</th>'+names.map(n=>`<th class="num">${esc(n)}</th>`).join('')+'</tr>';
+ $('board').innerHTML=s.board.map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(t.team)}</b></td><td class="num"><b>${t.total}</b></td><td class="num">${t.rescued}</td>`+
+  names.map(n=>`<td class="num">${t.worlds[n]?t.worlds[n].score+' <small>('+t.worlds[n].rescued+'/'+t.worlds[n].total+', '+fmt(t.worlds[n].elapsed)+')</small>':'-'}</td>`).join('')+'</tr>').join('')||
+  '<tr><td colspan="4" class="mute">No finished runs yet.</td></tr>';
+}
+tick();setInterval(tick,2000);
+</script>
+</body>
+</html>

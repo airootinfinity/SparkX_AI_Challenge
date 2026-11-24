@@ -1,0 +1,8 @@
+# keep the Docker build context small and free of host build products
+build/
+install/
+log/
+**/__pycache__/
+**/*.pyc
+**/*.egg-info/
+*.zip

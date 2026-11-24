@@ -1,0 +1,10 @@
+# Nothing an evaluator produces is ever committed: the teams' zips, the secret worlds (their
+# private/ folders are the answer sheets), results and the per-team build copies.
+submissions/*
+!submissions/README.md
+worlds/*
+!worlds/README.md
+results/
+work/
+# settings of your own machine
+host_config.json

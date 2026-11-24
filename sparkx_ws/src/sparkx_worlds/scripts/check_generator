@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""Stress-test the world generator: every size x difficulty over several seeds.
+
+usage: check_generator [--seeds N] [--out DIR]
+For each world it checks the organiser guarantees: every survivor has reachable approach points
+with line of sight, every clue's relation really holds for its target, every referenced landmark
+is unique and street-visible, every clue carries a marker reference that points at its target,
+every junction has a marker, people hidden from the streets are clue targets, the base can reach every survivor after any single aftershock,
+every survivor can be reached on a route that keeps clear of every fire (recomputed here from the saved
+obstacle map, independently of the generator), and no clutter intrudes on the start pad. Exit code 1 if
+any world fails. Every second world is generated with smoky lighting: those must carry heat sources (things at
+body temperature that are not people), clear of every person, fire and the start pad; the others must have none."""
+import argparse
+import math
+import os
+import shutil
+import sys
+import tempfile
+import time
+
+import numpy as np
+from scipy import ndimage
+
+from sparkx_worlds import city
+from sparkx_worlds.generator import MIN_HINTS, generate
+from sparkx_worlds.gt import FIRE_ROUTE_CLEAR_M, ROBOT_RADIUS
+from sparkx_worlds import heat as HEAT
+from sparkx_worlds.markers import KEEP_CLEAR_M, stated_point
+from sparkx_worlds.survivors import COUNTS, MAX_INDOOR_PATH_M
+
+def fire_safe_cells(wdir, sc):
+    """Cells the robot's centre can reach from the start pad while staying FIRE_ROUTE_CLEAR_M from
+    every fire centre, from the saved obstacle map. Returns (mask, origin, resolution)."""
+    z = np.load(os.path.join(wdir, 'private', 'occluders.npz'))
+    occ, (ox, oy), res = z['occ'] > 0, z['origin'], float(z['res'])
+    r = int(math.ceil(ROBOT_RADIUS / res))
+    yy, xx = np.mgrid[-r:r + 1, -r:r + 1]
+    free = ~ndimage.binary_dilation(occ, structure=(xx * xx + yy * yy) * res * res <= ROBOT_RADIUS ** 2)
+    jj, ii = np.mgrid[0:occ.shape[0], 0:occ.shape[1]]
+    wx, wy = ox + (ii + 0.5) * res, oy + (jj + 0.5) * res
+    for f in sc['fires']:
+        free &= (wx - f['x']) ** 2 + (wy - f['y']) ** 2 >= FIRE_ROUTE_CLEAR_M ** 2
+    lab, _ = ndimage.label(free, structure=np.ones((3, 3)))
+    k = lab[int((sc['start']['y'] - oy) / res), int((sc['start']['x'] - ox) / res)]
+    return (lab == k) & (k > 0), (ox, oy), res
+
+
+p = argparse.ArgumentParser()
+p.add_argument('--seeds', type=int, default=4)
+p.add_argument('--out', default=None)
+a = p.parse_args()
+out = a.out or tempfile.mkdtemp(prefix='sparkx_check_')
+fails, n, t_all = [], 0, time.time()
+for size in city.SIZES:
+    for diff in city.DIFFICULTY:
+        for k in range(a.seeds):
+            seed = 1000 + 97 * k + 13 * len(size) + 7 * len(diff)
+            name = f'chk_{size}_{diff}_{k}'
+            t0 = time.time()
+            try:
+                light = 'smoky' if k % 2 else 'day'
+                wdir, sc = generate(name, seed, size, diff, light, out, preview=False, verbose=False)
+            except Exception as e:  # noqa: BLE001
+                fails.append((name, f'EXCEPTION {type(e).__name__}: {e}'))
+                continue
+            n += 1
+            probs = []
+            want = COUNTS[size] + {'easy': -1, 'normal': 0, 'hard': 1}[diff]
+            if len(sc['survivors']) < want - 1:
+                probs.append(f'only {len(sc["survivors"])}/{want} survivors')
+            if len(sc['hints']) < MIN_HINTS[size]:
+                probs.append(f'only {len(sc["hints"])} clues')
+            ids = {s['id'] for s in sc['survivors']}
+            safe, (ox, oy), res = fire_safe_cells(wdir, sc)
+            for s in sc['survivors']:
+                if not s['approach_points']:
+                    probs.append(f'{s["id"]} has no approach point')
+                elif not any(safe[int((q[1] - oy) / res), int((q[0] - ox) / res)] for q in s['approach_points']):
+                    probs.append(f'{s["id"]} can only be reached by passing within {FIRE_ROUTE_CLEAR_M} m of a fire')
+                if not math.isfinite(s['path_from_start_m']):
+                    probs.append(f'{s["id"]} unreachable from base')
+                if s['indoor_path_m'] > MAX_INDOOR_PATH_M + 0.01:
+                    probs.append(f'{s["id"]} is {s["indoor_path_m"]} m inside a building')
+            lm = {l['id']: l for l in sc['landmarks']}
+            mk = {m['id']: m for m in sc['markers']}
+            for h in sc['hints']:
+                if h['source'] not in ids or h['target'] not in ids:
+                    probs.append(f'{h["id"]} references a missing survivor')
+                if h['landmark']['cls'] != 'marker':
+                    l = lm.get(h['landmark']['id'])
+                    if l is None or not l['unique'] or l['street_visibility'] <= 0:
+                        probs.append(f'{h["id"]} landmark not unique / not street-visible')
+                ref = h.get('marker')
+                if not ref or ref['id'] not in mk:
+                    probs.append(f'{h["id"]} has no usable marker reference')
+                else:
+                    t = next(s for s in sc['survivors'] if s['id'] == h['target'])
+                    px, py = stated_point(sc['markers'], ref)
+                    if math.hypot(px - t['x'], py - t['y']) > 2.5:
+                        probs.append(f'{h["id"]} marker reference is {math.hypot(px - t["x"], py - t["y"]):.1f} m off its target')
+            if len(mk) != len(sc['markers']):
+                probs.append('duplicate marker numbers')
+            nx, ny = city.SIZES[size]
+            if sum(m['kind'] == 'junction' for m in sc['markers']) < (nx + 1) * (ny + 1) - 2:
+                probs.append('junctions without a marker')
+            for m in sc['markers']:
+                if any(math.hypot(m['x'] - p['x'], m['y'] - p['y']) < KEEP_CLEAR_M - 0.01 for p in sc['survivors'] + sc['decoys']):
+                    probs.append(f'marker {m["id"]} stands next to a person')
+            hidden = [s['id'] for s in sc['survivors'] if s['street_visibility'] == 0]
+            targets = {h['target'] for h in sc['hints']}
+            if len(sc['hints']) >= len(hidden) and any(sid not in targets for sid in hidden):
+                probs.append('a survivor hidden from every street has no clue pointing at them')
+            st = sc['start']
+            hs = sc.get('heat_sources', [])
+            if light != 'smoky' and hs:
+                probs.append('heat sources in a world that is not smoky')
+            if light == 'smoky':
+                if len(hs) < HEAT.COUNTS[size] - 2:
+                    probs.append(f'only {len(hs)}/{HEAT.COUNTS[size]} heat sources')
+                for q in hs:
+                    if not HEAT.BODY_BAND_K[0] <= q['temperature'] <= HEAT.BODY_BAND_K[1]:
+                        probs.append(f'{q["id"]} is not at body temperature')
+                    if any(math.hypot(q['x'] - p['x'], q['y'] - p['y']) < HEAT.KEEP_FROM_PEOPLE_M - 0.01 for p in sc['survivors'] + sc['decoys']):
+                        probs.append(f'{q["id"]} stands next to a person')
+                    if any(math.hypot(q['x'] - f['x'], q['y'] - f['y']) < f['hazard_radius'] + 1.0 for f in sc['fires']):
+                        probs.append(f'{q["id"]} stands in a fire hazard zone')
+                    if math.hypot(q['x'] - st['x'], q['y'] - st['y']) < HEAT.KEEP_FROM_START_M - 0.01:
+                        probs.append(f'{q["id"]} stands at the start pad')
+            if any(math.hypot(f['x'] - st['x'], f['y'] - st['y']) < 8 for f in sc['fires']):
+                probs.append('fire within 8 m of the start pad')
+            if diff != 'easy' and len(sc['aftershocks']['candidates']) < sc['aftershocks']['count']:
+                probs.append('not enough aftershock candidates')
+            print(f'{name:26s} v{sc["seed_variant"]} {time.time() - t0:5.1f}s  surv {len(sc["survivors"]):2d}/{want:2d}  clues {len(sc["hints"])}  '
+                  f'fires {len(sc["fires"])}  landmarks {len(sc["landmarks"]):2d}  markers {len(sc["markers"]):2d}  heat {len(hs):2d}  shocks {len(sc["aftershocks"]["candidates"]):2d}  '
+                  + ('OK' if not probs else 'FAIL: ' + '; '.join(probs)), flush=True)
+            if probs:
+                fails.append((name, '; '.join(probs)))
+            shutil.rmtree(wdir, ignore_errors=True)
+print(f'\n{n} worlds generated in {time.time() - t_all:.0f}s, {len(fails)} failed')
+for f in fails:
+    print('  FAIL', *f)
+sys.exit(1 if fails else 0)

@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="sparkx_suv">
+    <static>true</static>
+    <link name="link">
+      <collision name="collision"><pose>0.0667 0.0339 1.0699 0 0 0</pose><geometry><box><size>4.5181 2.3434 2.1565</size></box></geometry></collision>
+      <visual name="visual"><pose>0 0 0 0 0 -1.5708</pose><geometry><mesh><uri>meshes/suv.obj</uri><scale>0.06 0.06 0.06</scale></mesh></geometry></visual>
+    </link>
+  </model>
+</sdf>

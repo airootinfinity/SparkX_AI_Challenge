@@ -1,0 +1,14 @@
+# colcon output
+sparkx_ws/build/
+sparkx_ws/install/
+sparkx_ws/log/
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+# your own runs, worlds and submissions
+*_submission.zip
+sparkx_logs/
+# editors
+.vscode/
+.idea/

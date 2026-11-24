@@ -1,0 +1,12 @@
+# /sparkx/mission/submit_record — submit the final map and mission memory for assessment.
+# May be called several times; the last submission before FINISHED (or within 30 s after) counts.
+# If never called, the referee falls back to the last /map and /team/semantic_map it received.
+
+nav_msgs/OccupancyGrid map        # frame "map" (origin = robot start pose)
+SemanticObject[] objects          # landmarks + survivors with status
+ClueStatus[] clues                # received clues and how they were resolved
+string[] rescue_order             # referee survivor ids in rescue order
+string record_json                # optional free-form JSON (extra evidence for the judges)
+---
+bool success
+string message

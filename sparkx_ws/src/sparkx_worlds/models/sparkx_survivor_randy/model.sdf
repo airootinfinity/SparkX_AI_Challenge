@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="sparkx_survivor_randy">
+    <static>true</static>
+    <link name="link">
+      <collision name="collision"><pose>0.0000 0.0001 0.9106 0 0 0</pose><geometry><box><size>1.0909 0.2858 1.8211</size></box></geometry></collision>
+      <visual name="visual"><pose>0 0 0 0 0 0</pose><geometry><mesh><uri>meshes/rescue_randy.dae</uri><scale>1.0 1.0 1.0</scale></mesh></geometry><material><diffuse>1 1 1 1</diffuse><specular>0.2 0.2 0.2 1</specular><pbr><metal><albedo_map>materials/textures/rescue_randy_albedo.png</albedo_map><normal_map>materials/textures/rescue_randy_normal.png</normal_map><roughness_map>materials/textures/rescue_randy_roughness.png</roughness_map><metalness_map>materials/textures/rescue_randy_metalness.png</metalness_map></metal></pbr></material><plugin filename="gz-sim-thermal-system" name="gz::sim::systems::Thermal"><heat_signature>materials/textures/RescueRandy_Thermal.png</heat_signature><max_temp>310.0</max_temp></plugin></visual>
+    </link>
+  </model>
+</sdf>
