@@ -1,0 +1,20 @@
+# SparkX ros_gz_bridge: REFEREE-ONLY topics (ground truth, gated actuation, contacts).
+# All ROS names live under /sparkx/referee_private/. In competition mode the referee and this bridge
+# run on the organizer machine; team software must never subscribe to these (checked by the referee).
+- ros_topic_name: /sparkx/referee_private/gt_odom
+  gz_topic_name: /sparkx/gt/odometry
+  ros_type_name: nav_msgs/msg/Odometry
+  gz_type_name: gz.msgs.Odometry
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /sparkx/referee_private/bumper
+  gz_topic_name: /sparkx/robot/bumper
+  ros_type_name: ros_gz_interfaces/msg/Contacts
+  gz_type_name: gz.msgs.Contacts
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /sparkx/referee_private/cmd_vel
+  gz_topic_name: /sparkx/robot/cmd_vel
+  ros_type_name: geometry_msgs/msg/Twist
+  gz_type_name: gz.msgs.Twist
+  direction: ROS_TO_GZ

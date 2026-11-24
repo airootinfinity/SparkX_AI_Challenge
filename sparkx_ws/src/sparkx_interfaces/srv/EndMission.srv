@@ -1,0 +1,8 @@
+# /sparkx/mission/end — the team declares the mission complete.
+# The return-to-base bonus is awarded when the robot is inside the base zone and stationary.
+string reason                      # e.g. "COMPLETED", "LOW_TIME", "GIVE_UP"
+---
+bool success
+string message
+bool in_base_zone
+int32 final_score

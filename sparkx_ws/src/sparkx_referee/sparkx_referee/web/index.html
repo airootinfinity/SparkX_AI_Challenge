@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>SparkX Referee</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+ :root{--ink:#191919;--ink2:#222224;--ink3:#2c2c2f;--line:#3a3a3e;--crimson:#e50227;--crimson2:#ff3350;
+       --paper:#f0eff2;--mute:#a4a3aa;--teal:#2fb3b3;--amber:#e8a81c;--ok:#36c275}
+ *{box-sizing:border-box}
+ body{margin:0;font-family:Lato,"Segoe UI",system-ui,sans-serif;background:var(--ink);color:var(--paper);font-size:14px}
+ header{display:flex;align-items:center;gap:18px;padding:12px 20px;background:#111;border-bottom:3px solid var(--crimson);flex-wrap:wrap}
+ header img{height:34px;display:block} header img.partners{height:40px;max-width:100%}
+ .divider{width:1px;height:30px;background:var(--line)}
+ .slashes{display:flex;gap:5px;margin-left:2px} .slashes i{display:block;width:5px;height:26px;background:var(--paper);transform:skewX(-24deg)}
+ header h1{font-size:15px;letter-spacing:.14em;text-transform:uppercase;margin:0;font-weight:800}
+ header h1 span{color:var(--crimson2)}
+ header .who{margin-left:auto;text-align:right;color:var(--mute);font-size:12px}
+ header .who b{display:block;color:var(--paper);font-size:14px}
+ .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+ .kpi{background:var(--ink2);padding:10px 16px} .kpi .l{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+ .kpi .v{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .kpi .v.small{font-size:15px;font-weight:700;padding-top:7px}
+ main{display:grid;grid-template-columns:minmax(0,3fr) minmax(300px,1fr);gap:14px;padding:14px 16px}
+ section{background:var(--ink2);border:1px solid var(--line);border-radius:4px;padding:12px;margin-bottom:14px}
+ section.map{padding:8px;margin:0} canvas{width:100%;display:block;background:#111;border-radius:2px}
+ h2{font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin:0 0 10px;color:var(--mute);font-weight:800}
+ ul{list-style:none;padding:0;margin:0;max-height:34vh;overflow:auto}
+ li{padding:5px 0;border-bottom:1px solid var(--ink3);font-size:13px;line-height:1.35;overflow-wrap:anywhere}
+ li:last-child{border:0} .neg{color:#ff7a8c} .pos{color:#7fe0a6} .t{color:var(--mute);font-variant-numeric:tabular-nums;margin-right:6px}
+ button{margin:0 6px 6px 0;padding:8px 14px;border:1px solid var(--line);border-radius:3px;background:var(--ink3);color:var(--paper);
+        font:inherit;font-weight:700;cursor:pointer} button:hover{border-color:var(--paper)}
+ button.go{background:var(--crimson);border-color:var(--crimson)} button.go:hover{background:var(--crimson2)}
+ button.warn{border-color:#7a2a35;color:#ff9aa8}
+ input{width:130px;padding:7px 9px;border:1px solid var(--line);border-radius:3px;background:#111;color:var(--paper);font:inherit}
+ label{display:block;font-size:12px;color:var(--mute);margin-bottom:10px} label input{margin-left:8px}
+ .badge{display:inline-block;padding:3px 9px;border-radius:3px;font-weight:800;font-size:12px;letter-spacing:.08em}
+ .b-ok{background:#12351f;color:var(--ok)} .b-bad{background:#4a0d17;color:#ff8597} .b-warn{background:#3c2f08;color:var(--amber)}
+ .row{display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:13px} .row span:first-child{color:var(--mute)}
+ .mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+ #gate{display:none;margin:60px auto;max-width:420px;text-align:center} #gate.on{display:block}
+ #note{font-size:12px;color:var(--mute);min-height:16px;margin-top:4px} .legend{font-size:12px;color:var(--mute);padding:8px 4px 2px}
+ .legend b{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 5px 0 12px}
+ .cams{display:grid;grid-template-columns:1fr 1fr;gap:8px} .cams figure{margin:0}
+ .cams img{width:100%;aspect-ratio:5/4;object-fit:contain;background:#111;border-radius:2px;display:block}
+ .cams figcaption{font-size:11px;color:var(--mute);padding-top:4px;text-align:center}
+ @media (max-width:900px){main{grid-template-columns:1fr}}
+</style></head><body>
+<header>
+ <img class="partners" src="/brand/header.png" alt="IIIT Allahabad | STEMLearn.AI | Airoot | Presented at IIT Bombay Techfest"
+      onerror="this.replaceWith(document.createTextNode('IIIT Allahabad · STEMLearn.AI · Airoot · Presented at IIT Bombay Techfest'))">
+ <div class="slashes" aria-hidden="true"><i></i><i></i><i></i></div>
+ <h1>SparkX <span>Disaster Response Challenge</span> &middot; Referee</h1>
+ <div class="who"><b id="team">-</b><span id="world">-</span></div>
+</header>
+<div id="gate"><section><h2>Admin token required</h2>
+ <p>This dashboard shows ground truth and is reachable from the network, so it needs the admin token printed in the referee log.</p>
+ <input id="gtok" type="password" aria-label="admin token" placeholder="token"> <button class="go" onclick="setTok(document.getElementById('gtok').value)">Open</button>
+</section></div>
+<div id="app">
+<div class="kpis">
+ <div class="kpi"><div class="l">State</div><div class="v small" id="state">-</div></div>
+ <div class="kpi"><div class="l">Time left</div><div class="v" id="time">-</div></div>
+ <div class="kpi"><div class="l">Score</div><div class="v" id="score">-</div></div>
+ <div class="kpi"><div class="l">Rescued</div><div class="v" id="resc">-</div></div>
+ <div class="kpi"><div class="l">Collisions</div><div class="v" id="coll">-</div></div>
+ <div class="kpi"><div class="l">Health</div><div class="v" id="health">-</div></div>
+ <div class="kpi"><div class="l">Robot behaviour</div><div class="v small" id="beh">-</div></div>
+</div>
+<main>
+ <section class="map"><canvas id="c" aria-label="Arena map with robot track, survivors, fires and aftershocks"></canvas>
+  <div class="legend"><b style="background:#e50227;margin-left:0"></b>survivor waiting<b style="background:#36c275"></b>rescued
+   <b style="background:#ff8a1f"></b>fire hazard<b style="background:#f0eff2"></b>robot track<b style="background:#b0763a"></b>aftershock rubble</div></section>
+ <div>
+  <section><h2>Rover cameras</h2>
+   <div class="cams">
+    <figure><img id="cam_rgb" alt="Colour camera"><figcaption>Colour</figcaption></figure>
+    <figure><img id="cam_thermal" alt="Thermal camera"><figcaption>Thermal (290&ndash;330 K)</figcaption></figure>
+   </div></section>
+  <section><h2>Organizer</h2>
+   <label>Admin token <input id="tok" type="password" aria-label="admin token" onchange="setTok(this.value)"></label>
+   <button class="go" onclick="adm('start')">Start / Resume</button><button onclick="adm('pause')">Pause</button>
+   <button class="warn" onclick="adm('intervention')">Intervention (-75)</button>
+   <button class="warn" onclick="if(confirm('Abort this run?'))adm('abort')">Abort</button>
+   <div id="note"></div></section>
+  <section><h2>Lock-down</h2>
+   <div class="row"><span>Stack integrity</span><span id="integ" class="badge">-</span></div>
+   <div class="row"><span>Fingerprint</span><span id="fp" class="mono">-</span></div>
+   <div class="row"><span>Mode</span><span id="mode">-</span></div>
+   <div class="row"><span>Rule violations</span><span id="vcount" class="badge">-</span></div>
+   <ul id="viol"></ul></section>
+  <section><h2>Hints released</h2><ul id="hints"></ul></section>
+  <section><h2>Events</h2><ul id="events"></ul></section>
+ </div>
+</main>
+</div>
+<script>
+const $=id=>document.getElementById(id),c=$('c'),g=c.getContext('2d');
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+let tok='';try{tok=sessionStorage.getItem('sparkx_token')||''}catch(e){}
+{const u=new URLSearchParams(location.search).get('token');if(u){tok=u;try{sessionStorage.setItem('sparkx_token',tok)}catch(e){}}}
+let bg=null,bgTok=null;
+function setTok(v){tok=v.trim();try{sessionStorage.setItem('sparkx_token',tok)}catch(e){}$('tok').value=tok;tick()}
+function q(){return tok?('?token='+encodeURIComponent(tok)):''}
+function adm(a){if(!tok){$('note').textContent='Enter the admin token first.';return}
+ fetch(`/admin/${a}/${encodeURIComponent(tok)}`,{method:'POST'}).then(r=>r.json())
+  .then(j=>{$('note').textContent=j.error?('Refused: '+j.error):(j.start_block&&a==='start'?('Start refused: '+j.start_block):('OK: '+j.state_text))})
+  .catch(()=>{$('note').textContent='Request failed.'})}
+function fmt(s){s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+function badge(el,txt,cls){el.textContent=txt;el.className='badge '+cls}
+async function tick(){
+ let r;try{r=await fetch('/state'+q())}catch(e){return}
+ if(r.status===403){$('gate').classList.add('on');$('app').style.display='none';return}
+ $('gate').classList.remove('on');$('app').style.display='';
+ const s=await r.json(),st=s.status,H=s.shape[0],W=s.shape[1];
+ if(!bg||bgTok!==tok){bg=new Image();bg.src='/gt.png'+q();bgTok=tok}
+ $('team').textContent=st.team;$('world').textContent=st.world;
+ $('state').textContent=st.state_text+(st.finish_reason?' - '+st.finish_reason:'');
+ $('state').style.color=s.lockdown.disqualified?'#ff8597':'';
+ $('time').textContent=fmt(st.remaining);$('score').textContent=st.score;
+ $('resc').textContent=st.rescued+' / '+s.survivors.length;$('coll').textContent=st.collisions;
+ $('health').textContent=Math.round(st.health)+'%';
+ $('beh').textContent=s.behavior?(s.behavior.state+' '+s.behavior.detail):'-';
+ const ig=s.integrity;badge($('integ'),ig.status.toUpperCase(),ig.status==='ok'?'b-ok':(ig.status==='modified'?'b-bad':'b-warn'));
+ $('integ').title=ig.note+(ig.changed.length?'\n'+ig.changed.join('\n'):'');
+ $('fp').textContent=ig.fingerprint||'-';
+ $('mode').textContent=(s.lockdown.competition?'competition':'practice')+' / violations: '+s.lockdown.policy;
+ badge($('vcount'),s.lockdown.disqualified?'DISQUALIFIED':String(s.violations.length),s.violations.length?'b-bad':'b-ok');
+ let v=s.violations.map(x=>`<li class="neg"><span class="t">${x.t.toFixed(0)}s</span>${esc(x.node)} ${esc(x.action)} ${esc(x.topic)}</li>`).join('');
+ if(ig.status!=='ok')v=`<li class="neg">${esc(ig.note)}</li>`+ig.changed.map(f=>`<li class="mono">${esc(f)}</li>`).join('')+v;
+ if(s.lockdown.start_block)v=`<li class="neg"><b>Start blocked:</b> ${esc(s.lockdown.start_block)}</li>`+v;
+ $('viol').innerHTML=v;
+ c.width=W;c.height=H;if(bg.complete&&bg.naturalWidth)g.drawImage(bg,0,0);
+ const P=(x,y)=>[(x-s.origin[0])/s.res,H-(y-s.origin[1])/s.res],R=1/s.res;
+ for(const f of s.fires){const[p,q2]=P(f.x,f.y);g.strokeStyle='#ff8a1f';g.lineWidth=4;g.beginPath();g.arc(p,q2,f.r*R,0,7);g.stroke()}
+ for(const a of s.aftershocks){const[p,q2]=P(a.x,a.y);g.fillStyle='#b0763a';g.fillRect(p-a.w*R/2,q2-a.w*R/2,a.w*R,a.w*R)}
+ {const[p,q2]=P(s.base.x,s.base.y);g.strokeStyle='#e50227';g.lineWidth=5;g.setLineDash([14,10]);g.beginPath();g.arc(p,q2,s.base.r*R,0,7);g.stroke();g.setLineDash([])}
+ g.strokeStyle='#f0eff2';g.lineWidth=4;g.beginPath();s.track.forEach((t,i)=>{const[p,q2]=P(t[0],t[1]);i?g.lineTo(p,q2):g.moveTo(p,q2)});g.stroke();
+ g.font='bold 30px sans-serif';
+ for(const u of s.survivors){const[p,q2]=P(u.x,u.y);g.fillStyle=u.rescued?'#36c275':'#e50227';g.beginPath();g.arc(p,q2,14,0,7);g.fill();
+  g.lineWidth=3;g.strokeStyle='#111';g.stroke();g.fillStyle='#f0eff2';g.fillText(u.id,p+18,q2-10)}
+ if(s.robot){const[p,q2]=P(s.robot.x,s.robot.y);g.save();g.translate(p,q2);g.rotate(-s.robot.yaw);g.fillStyle='#f0eff2';g.strokeStyle='#e50227';g.lineWidth=5;
+  g.beginPath();g.moveTo(26,0);g.lineTo(-16,15);g.lineTo(-16,-15);g.closePath();g.fill();g.stroke();g.restore()}
+ $('hints').innerHTML=s.hints.map(h=>`<li><b>${esc(h.id)}</b> <span class="t">${esc(h.source)} &rarr; ${esc(h.target)}</span><br>${esc(h.text)}</li>`).join('')||'<li class="t">none yet</li>';
+ $('events').innerHTML=s.events.map(e=>`<li class="${e.score_delta<0||e.type==='RULE_VIOLATION'?'neg':(e.score_delta>0?'pos':'')}"><span class="t">${e.t.toFixed(0)}s</span><b>${esc(e.type)}</b> ${esc(e.description)} ${e.score_delta?'('+(e.score_delta>0?'+':'')+e.score_delta+')':''}</li>`).join('');
+}
+function cam(name){const el=$('cam_'+name);
+ const next=d=>setTimeout(()=>{el.src='/cam/'+name+'.jpg'+(q()||'?')+(q()?'&':'')+'t='+Date.now()},d);
+ el.onload=()=>next(300);el.onerror=()=>next(1500);next(0)}
+$('tok').value=tok;setInterval(tick,1000);tick();cam('rgb');cam('thermal');
+</script></body></html>

@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+"""Photo mode (organisers): drop temporary cameras into a running SparkX world and save what they see.
+
+  ros2 run sparkx_sim photo --world NAME --out DIR  name:x,y,z,pitch,yaw [name:x,y,z,pitch,yaw ...]
+          [--size 1280x800] [--fov 1.25]
+pitch > 0 looks down; yaw is the heading in world ENU (rad)."""
+import argparse, json, os, subprocess, sys, time
+import numpy as np
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
+from sensor_msgs.msg import Image as RosImage
+from PIL import Image
+
+p = argparse.ArgumentParser()
+p.add_argument('--world', required=True); p.add_argument('--out', required=True)
+p.add_argument('--size', default='1280x800'); p.add_argument('--fov', type=float, default=1.25)
+p.add_argument('shots', nargs='+')
+a = p.parse_args()
+w, h = map(int, a.size.split('x'))
+os.makedirs(a.out, exist_ok=True)
+shots = []
+for s in a.shots:
+    name, vals = s.split(':'); x, y, z, pitch, yaw = map(float, vals.split(','))
+    shots.append((name, x, y, z, pitch, yaw))
+
+def gz(service, reqtype, req, reptype='gz.msgs.Boolean'):
+    return subprocess.run(['gz', 'service', '-s', service, '--reqtype', reqtype, '--reptype', reptype, '--timeout', '8000',
+                           '--req', req], capture_output=True, text=True).stdout.strip()
+
+tag = f'snap{os.getpid()}'
+for k, (name, x, y, z, pitch, yaw) in enumerate(shots):
+    sdf = (f'<?xml version="1.0"?><sdf version="1.9"><model name="{tag}_{k}"><static>true</static>'
+           f'<pose>{x} {y} {z} 0 {pitch} {yaw}</pose><link name="l"><sensor name="c" type="camera">'
+           f'<always_on>true</always_on><update_rate>4</update_rate><topic>/{tag}/c{k}</topic>'
+           f'<camera><horizontal_fov>{a.fov}</horizontal_fov><image><width>{w}</width><height>{h}</height>'
+           f'<format>R8G8B8</format></image><clip><near>0.05</near><far>900</far></clip></camera></sensor></link></model></sdf>')
+    gz(f'/world/{a.world}/create', 'gz.msgs.EntityFactory', f'sdf: {json.dumps(sdf)}')
+bridge = subprocess.Popen(['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge'] +
+                          [f'/{tag}/c{k}@sensor_msgs/msg/Image[gz.msgs.Image' for k in range(len(shots))],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+rclpy.init()
+node = Node(tag)
+got, count = {}, {}
+def cb(msg, k):
+    count[k] = count.get(k, 0) + 1
+    if count[k] >= 3:          # let exposure / particles settle
+        got[k] = np.frombuffer(msg.data, np.uint8).reshape(msg.height, msg.width, 3).copy()
+for k in range(len(shots)):
+    node.create_subscription(RosImage, f'/{tag}/c{k}', lambda m, k=k: cb(m, k), qos_profile_sensor_data)
+t0 = time.time()
+while len(got) < len(shots) and time.time() - t0 < 150:
+    rclpy.spin_once(node, timeout_sec=0.2)
+for k, (name, *_r) in enumerate(shots):
+    if k in got:
+        Image.fromarray(got[k]).save(os.path.join(a.out, name + '.png')); print('saved', name)
+    else:
+        print('NO FRAME', name)
+bridge.terminate()
+for k in range(len(shots)):
+    gz(f'/world/{a.world}/remove', 'gz.msgs.Entity', f'name: "{tag}_{k}" type: MODEL')
+node.destroy_node(); rclpy.shutdown()

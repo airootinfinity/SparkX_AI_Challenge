@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""Film a SparkX run (organisers).
+
+  ros2 run sparkx_sim record_mission --out run.mp4 [--speed 4] [--fps 20] [--title "Team X"]
+
+Start it after the simulation is up. It records until the mission is FINISHED (or Ctrl-C) and
+writes one MP4 that shows, side by side:
+  * a chase camera following the rover (rendered by Gazebo only while this tool runs),
+  * the rover's own camera with the team's detections drawn on it, and the thermal image,
+  * the team's map with the rover's trail, its current target and everything it has remembered,
+  * mission clock, score, rescues, the team's behaviour state and the referee's event log.
+`--speed 4` samples the simulation every 0.2 s and plays it back at 20 fps, i.e. four times faster.
+
+The chase camera lives on a referee-private topic. In a run with competition:=true pass
+trusted_nodes:=sparkx_recorder* to the referee, otherwise the recorder itself trips the
+ground-truth tripwire."""
+import argparse
+import math
+import os
+import subprocess
+import sys
+import time
+
+import cv2
+import numpy as np
+import rclpy
+import tf2_ros
+from nav_msgs.msg import OccupancyGrid
+from PIL import Image as PI, ImageDraw, ImageFont
+from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
+from sensor_msgs.msg import Image
+
+from sparkx_interfaces.msg import BehaviorState, MissionEvent, MissionStatus, SemanticMap
+
+INK, CRIMSON, OFFWHITE, GREY = (25, 25, 25), (229, 2, 39), (240, 239, 242), (150, 150, 155)
+W, H = 1280, 720
+MAIN = (896, 504)            # chase view
+SIDE = W - MAIN[0]           # right column width (384)
+CAM_H = 288
+CHASE = '/sparkx/referee_private/chase_cam'
+
+
+def font(size, bold=True):
+    for p in (f'/usr/share/fonts/truetype/lato/Lato-{"Black" if bold else "Regular"}.ttf',
+              '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'):
+        if os.path.exists(p):
+            return ImageFont.truetype(p, size)
+    return ImageFont.load_default()
+
+
+def brand_strip():
+    """The partner header for the footer (IIIT Allahabad | STEMLearn.AI | Airoot | Presented at IIT Bombay
+    Techfest, left to right), from the worlds package's brand folder."""
+    try:
+        from sparkx_worlds import branding
+        return branding.header_strip(380, 34)          # fits beside the title line under the chase view
+    except Exception:
+        return None
+
+
+class Recorder(Node):
+    def __init__(self, a):
+        super().__init__('sparkx_recorder', parameter_overrides=[rclpy.parameter.Parameter('use_sim_time', value=True)])
+        self.a = a
+        self.dt = a.speed / a.fps                      # simulation seconds between captured frames
+        self.chase = self.cam = self.thermal = self.grid = None
+        self.status = self.behavior = None
+        self.objs, self.events, self.trail = [], [], []
+        self.t_last, self.frames, self.finished_at = None, 0, None
+        self.create_subscription(Image, CHASE, lambda m: setattr(self, 'chase', m), qos_profile_sensor_data)
+        self.create_subscription(Image, '/perception/debug', lambda m: setattr(self, 'cam', m), 2)
+        self.create_subscription(Image, '/camera/color/image_raw', self.on_raw, qos_profile_sensor_data)
+        self.create_subscription(Image, '/thermal/image_raw', lambda m: setattr(self, 'thermal', m), qos_profile_sensor_data)
+        latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
+        self.create_subscription(OccupancyGrid, '/map', lambda m: setattr(self, 'grid', m), latched)
+        self.create_subscription(MissionStatus, '/sparkx/mission/status', lambda m: setattr(self, 'status', m), 5)
+        self.create_subscription(BehaviorState, '/team/behavior_state', lambda m: setattr(self, 'behavior', m), 5)
+        self.create_subscription(SemanticMap, '/team/semantic_map', lambda m: setattr(self, 'objs', list(m.objects)), 5)
+        self.create_subscription(MissionEvent, '/sparkx/mission/events', self.on_event, 50)
+        self.tf = tf2_ros.Buffer()
+        self.tfl = tf2_ros.TransformListener(self.tf, self)
+        self.raw = None
+        self.f_big, self.f_med, self.f_small, self.f_tiny = font(30), font(19), font(15, False), font(13, False)
+        self.brand = brand_strip()
+        self.writer = cv2.VideoWriter(a.out, cv2.VideoWriter_fourcc(*'mp4v'), a.fps, (W, H))
+        if not self.writer.isOpened():
+            raise SystemExit(f'cannot open {a.out} for writing')
+        self.create_timer(0.02, self.tick, clock=rclpy.clock.Clock(clock_type=rclpy.clock.ClockType.STEADY_TIME))
+
+    def on_raw(self, m):
+        self.raw = m
+
+    def on_event(self, e):
+        if e.type in ('TIME_WARNING', 'STACK_INTEGRITY') or 'chase_cam' in e.description:
+            return                                     # housekeeping, and this recorder's own camera feed
+        t = self.status.elapsed_s if self.status else 0.0
+        self.events.append((t, e.type, e.description, e.score_delta))
+
+    # ------------------------------------------------------------ helpers
+    @staticmethod
+    def img(m):
+        a = np.frombuffer(m.data, np.uint8).reshape(m.height, m.width, 3)
+        return a[:, :, ::-1] if m.encoding == 'bgr8' else a          # -> RGB
+
+    def pose(self):
+        try:
+            t = self.tf.lookup_transform('map', 'base_link', rclpy.time.Time())
+            q = t.transform.rotation
+            return (t.transform.translation.x, t.transform.translation.y,
+                    math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)))
+        except Exception:
+            return None
+
+    def map_panel(self, w, h, pose):
+        out = PI.new('RGB', (w, h), (38, 38, 40))
+        g = self.grid
+        if g is None or g.info.width == 0:
+            ImageDraw.Draw(out).text((12, h // 2 - 8), 'waiting for the map ...', fill=GREY, font=self.f_small)
+            return out
+        d = np.asarray(g.data, np.int8).reshape(g.info.height, g.info.width)
+        rgb = np.full(d.shape + (3,), 58, np.uint8)
+        rgb[(d >= 0) & (d < 50)] = (206, 204, 198)
+        rgb[d >= 50] = (20, 20, 22)
+        known = np.argwhere(d >= 0)
+        if len(known) == 0:
+            return out
+        (j0, i0), (j1, i1) = known.min(0), known.max(0)
+        pad = 12
+        j0, i0, j1, i1 = max(0, j0 - pad), max(0, i0 - pad), min(d.shape[0], j1 + pad), min(d.shape[1], i1 + pad)
+        crop = rgb[j0:j1, i0:i1][::-1]
+        s = min(w / crop.shape[1], h / crop.shape[0])
+        im = PI.fromarray(crop).resize((max(1, int(crop.shape[1] * s)), max(1, int(crop.shape[0] * s))), PI.NEAREST)
+        ox, oy = (w - im.width) // 2, (h - im.height) // 2
+        out.paste(im, (ox, oy))
+        dr = ImageDraw.Draw(out)
+        res, mx0, my0 = g.info.resolution, g.info.origin.position.x, g.info.origin.position.y
+
+        def P(x, y):
+            return (ox + ((x - mx0) / res - i0) * s, oy + im.height - ((y - my0) / res - j0) * s)
+        bx, by = P(0.0, 0.0)
+        r = 3.0 / res * s
+        dr.ellipse([bx - r, by - r, bx + r, by + r], outline=(225, 0, 225), width=2)
+        if len(self.trail) > 1:
+            dr.line([P(x, y) for x, y in self.trail], fill=(40, 130, 255), width=2)
+        for o in self.objs:
+            x, y = P(o.position.x, o.position.y)
+            if o.object_class == 'survivor':
+                if o.status in ('REJECTED',):
+                    continue
+                col = (40, 200, 70) if o.status == 'RESCUED' else ((235, 40, 40) if o.status == 'CONFIRMED' else (235, 150, 60))
+                dr.ellipse([x - 5, y - 5, x + 5, y + 5], fill=col, outline=(255, 255, 255))
+            elif o.object_class == 'fire':
+                dr.polygon([(x, y - 6), (x + 5, y + 4), (x - 5, y + 4)], fill=(255, 140, 0))
+            elif o.status != 'REJECTED':
+                dr.rectangle([x - 3, y - 3, x + 3, y + 3], fill=(250, 210, 40) if o.object_class == 'sign' else (60, 170, 230))
+        b = self.behavior
+        if b is not None and (b.target.x or b.target.y) and pose is not None:
+            tx, ty = P(b.target.x, b.target.y)
+            dr.line([P(pose[0], pose[1]), (tx, ty)], fill=CRIMSON, width=1)
+            dr.line([tx - 5, ty - 5, tx + 5, ty + 5], fill=CRIMSON, width=2)
+            dr.line([tx - 5, ty + 5, tx + 5, ty - 5], fill=CRIMSON, width=2)
+        if pose is not None:
+            x, y = P(pose[0], pose[1])
+            c, sn = math.cos(pose[2]), -math.sin(pose[2])
+            dr.polygon([(x + 9 * c, y + 9 * sn), (x - 6 * c - 5 * sn, y - 6 * sn + 5 * c), (x - 6 * c + 5 * sn, y - 6 * sn - 5 * c)],
+                       fill=(255, 205, 0), outline=(0, 0, 0))
+        dr.rectangle([0, 0, w - 1, 20], fill=(25, 25, 25))
+        dr.text((8, 2), "ROVER'S OWN MAP  (SLAM)", fill=OFFWHITE, font=self.f_tiny)
+        return out
+
+    # ------------------------------------------------------------ one video frame
+    def compose(self):
+        pose = self.pose()
+        if pose is not None and (not self.trail or math.hypot(pose[0] - self.trail[-1][0], pose[1] - self.trail[-1][1]) > 0.3):
+            self.trail.append((pose[0], pose[1]))
+        fr = PI.new('RGB', (W, H), INK)
+        d = ImageDraw.Draw(fr)
+        if self.chase is not None:
+            fr.paste(PI.fromarray(self.img(self.chase)).resize(MAIN, PI.BILINEAR), (0, 0))
+        else:
+            d.text((40, 230), 'waiting for the chase camera ...', fill=GREY, font=self.f_med)
+        src = self.cam if self.cam is not None else self.raw
+        if src is not None:
+            fr.paste(PI.fromarray(self.img(src)).resize((SIDE, CAM_H), PI.BILINEAR), (MAIN[0], 0))
+        if self.thermal is not None:
+            t = np.frombuffer(self.thermal.data, np.uint16).reshape(self.thermal.height, self.thermal.width) * 0.01
+            g8 = np.clip((t - 292.0) / 28.0 * 255, 0, 255).astype(np.uint8)
+            th = cv2.applyColorMap(g8, cv2.COLORMAP_INFERNO)[:, :, ::-1]
+            fr.paste(PI.fromarray(th).resize((150, 120), PI.BILINEAR), (W - 154, CAM_H - 124))
+            d.rectangle([W - 155, CAM_H - 125, W - 4, CAM_H - 4], outline=OFFWHITE)
+            d.text((W - 150, CAM_H - 122), 'THERMAL', fill=OFFWHITE, font=self.f_tiny)
+        d.rectangle([MAIN[0], 0, W - 1, 20], fill=(25, 25, 25))
+        d.text((MAIN[0] + 8, 2), "ROVER CAMERA + DETECTIONS", fill=OFFWHITE, font=self.f_tiny)
+        fr.paste(self.map_panel(SIDE, H - CAM_H, pose), (MAIN[0], CAM_H))
+        d.line([MAIN[0], 0, MAIN[0], H], fill=OFFWHITE, width=1)
+        d.line([MAIN[0], CAM_H, W, CAM_H], fill=OFFWHITE, width=1)
+        # ---- footer under the chase view
+        y0 = MAIN[1]
+        d.line([0, y0, MAIN[0], y0], fill=CRIMSON, width=3)
+        s = self.status
+        if s is not None:
+            rem = max(0.0, s.remaining_s)
+            d.text((18, y0 + 12), f'{int(rem // 60):02d}:{int(rem % 60):02d}', fill=OFFWHITE, font=self.f_big)
+            d.text((18, y0 + 48), 'TIME LEFT', fill=GREY, font=self.f_tiny)
+            d.text((130, y0 + 12), f'{s.score}', fill=CRIMSON if s.score < 0 else OFFWHITE, font=self.f_big)
+            d.text((130, y0 + 48), 'SCORE', fill=GREY, font=self.f_tiny)
+            total = f' / {s.survivors_total}' if s.survivors_total else ''
+            d.text((232, y0 + 12), f'{s.survivors_rescued}{total}', fill=OFFWHITE, font=self.f_big)
+            d.text((232, y0 + 48), 'RESCUED', fill=GREY, font=self.f_tiny)
+            d.text((338, y0 + 12), f'{s.collisions}', fill=OFFWHITE, font=self.f_big)
+            d.text((338, y0 + 48), 'COLLISIONS', fill=GREY, font=self.f_tiny)
+            d.text((18, y0 + 76), f'{s.state_text}  ·  {s.world_name}  ·  x{self.a.speed:g} speed', fill=GREY, font=self.f_small)
+        b = self.behavior
+        d.text((18, y0 + 104), 'ROVER IS:', fill=GREY, font=self.f_tiny)
+        d.text((18, y0 + 122), (b.state.replace('_', ' ') if b else 'starting up'), fill=CRIMSON, font=self.f_med)
+        if b and b.detail:
+            d.text((18, y0 + 150), b.detail[:52], fill=OFFWHITE, font=self.f_small)
+        if self.a.title:
+            d.text((18, y0 + 182), self.a.title[:54], fill=OFFWHITE, font=self.f_small)
+        if self.brand is not None:
+            fr.paste(self.brand, (MAIN[0] - self.brand.width - 16, y0 + 172), self.brand)
+        d.text((440, y0 + 12), 'REFEREE LOG', fill=GREY, font=self.f_tiny)
+        for k, (t, typ, text, pts) in enumerate(self.events[-6:]):
+            col = (120, 230, 130) if pts > 0 else ((255, 120, 110) if pts < 0 else OFFWHITE)
+            line = f'{int(t // 60):02d}:{int(t % 60):02d}  {typ.replace("_", " ").title()}' + (f'  {pts:+d}' if pts else '')
+            d.text((440, y0 + 30 + 23 * k), line[:50], fill=col, font=self.f_small)
+        return np.asarray(fr)[:, :, ::-1]
+
+    def tick(self):
+        now = self.get_clock().now().nanoseconds * 1e-9
+        if now <= 0:
+            return
+        if self.t_last is None or now - self.t_last >= self.dt:
+            self.t_last = now
+            self.writer.write(np.ascontiguousarray(self.compose()))
+            self.frames += 1
+            if self.frames % 200 == 0:
+                self.get_logger().info(f'{self.frames} frames ({self.frames / self.a.fps:.0f} s of video)')
+        if self.status is not None and self.status.state == MissionStatus.FINISHED and self.finished_at is None:
+            self.finished_at = time.time()
+        if (self.finished_at and time.time() - self.finished_at > 6.0) or (self.a.max_minutes and self.frames / self.a.fps > self.a.max_minutes * 60):
+            raise KeyboardInterrupt
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--out', default='sparkx_run.mp4')
+    ap.add_argument('--fps', type=float, default=20.0)
+    ap.add_argument('--speed', type=float, default=4.0, help='playback speed-up (simulation seconds per video second)')
+    ap.add_argument('--title', default='')
+    ap.add_argument('--max-minutes', type=float, default=0.0, help='stop after this much video (0 = until the mission ends)')
+    a = ap.parse_args(rclpy.utilities.remove_ros_args(sys.argv)[1:])
+    a.out = os.path.abspath(os.path.expanduser(a.out))
+    os.makedirs(os.path.dirname(a.out), exist_ok=True)
+    bridge = subprocess.Popen(['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge', f'{CHASE}@sensor_msgs/msg/Image[gz.msgs.Image',
+                               '--ros-args', '-r', '__node:=sparkx_recorder_bridge'],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    rclpy.init()
+    n = Recorder(a)
+    try:
+        rclpy.spin(n)
+    except BaseException:                       # Ctrl-C, shutdown, or the context going away under us
+        pass
+    finally:
+        n.writer.release()
+        try:
+            os.killpg(bridge.pid, 15)
+        except Exception:
+            bridge.terminate()
+        print(f'wrote {a.out}: {n.frames} frames, {n.frames / a.fps:.0f} s of video')
+
+
+if __name__ == '__main__':
+    main()

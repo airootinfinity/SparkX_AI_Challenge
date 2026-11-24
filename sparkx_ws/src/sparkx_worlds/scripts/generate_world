@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+"""Generate a SparkX disaster world.
+
+Example (organizer, secret competition world):
+  ros2 run sparkx_worlds generate_world --name final_A --seed 90412 --size large --difficulty hard \
+      --lighting smoky --out ~/sparkx_private_worlds
+"""
+from sparkx_worlds.generator import main
+
+if __name__ == '__main__':
+    main()

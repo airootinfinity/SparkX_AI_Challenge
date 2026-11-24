@@ -1,0 +1,13 @@
+rules_version: '1.1'
+world: practice_small_day
+size: small
+difficulty: easy
+lighting: day
+time_limit_s: 900.0
+arena_size_m:
+- 78
+- 78
+survivors_total: 4
+markers_total: 17
+marker_dictionary: DICT_4X4_100
+note: Organizer-generated SparkX world. private/ must never be given to teams.

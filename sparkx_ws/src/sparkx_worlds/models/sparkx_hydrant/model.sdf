@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="sparkx_hydrant">
+    <static>true</static>
+    <link name="link">
+      <collision name="collision"><pose>0.0000 -0.0000 0.4635 0 0 0</pose><geometry><box><size>0.3389 0.3389 0.9313</size></box></geometry></collision>
+      <visual name="visual"><pose>0 0 0 0 0 0</pose><geometry><mesh><uri>meshes/fire_hydrant.dae</uri><scale>1.0 1.0 1.0</scale></mesh></geometry></visual>
+    </link>
+  </model>
+</sdf>

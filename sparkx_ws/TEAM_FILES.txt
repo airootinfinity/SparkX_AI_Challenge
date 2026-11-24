@@ -1,0 +1,16 @@
+# SparkX Disaster Response Challenge - files a team may edit.
+#
+# This list is the single source of truth for the lock-down:
+#   * tools/sparkx_lock.py hashes every other stack file into LOCKED_MANIFEST.sha256,
+#   * a submission archive may contain these paths and nothing else,
+#   * the referee refuses (competition mode) to run a stack whose locked files differ.
+#
+# One path per line, relative to this folder. A trailing "/" marks a data-only folder.
+
+src/sparkx_team/sparkx_team/perception.py
+src/sparkx_team/sparkx_team/memory.py
+src/sparkx_team/sparkx_team/mission.py
+src/sparkx_team/config/team.yaml
+
+# Trained model weights and other data (no code: .py / .so / .sh ... are rejected).
+src/sparkx_team/models/

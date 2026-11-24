@@ -1,0 +1,419 @@
+sparkx_ambulance:
+  cls: ambulance
+  color: white
+  fuel: Ambulance
+  kind: vehicle
+  max:
+  - 3.8495
+  - 1.4842
+  - 2.8738
+  mesh: meshes/ambulance.obj
+  mesh_pose: &id001
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 1.5707963
+  min:
+  - -3.6857
+  - -1.4842
+  - -0.0203
+  scale: 0.0254
+  thermal: null
+sparkx_bus:
+  cls: bus
+  color: gray
+  fuel: Bus
+  kind: vehicle
+  max:
+  - 6.2947
+  - 1.3538
+  - 3.6976
+  mesh: meshes/bus.obj
+  mesh_pose: *id001
+  min:
+  - -6.1914
+  - -1.3538
+  - -0.0007
+  scale: 0.01
+  thermal: null
+sparkx_car_blue:
+  cls: car
+  color: blue
+  fuel: Hatchback red
+  hue_shift: 0.62
+  kind: vehicle
+  max:
+  - 2.3441
+  - 1.0702
+  - 1.5566
+  mesh: meshes/hatchback.obj
+  mesh_pose: *id001
+  min:
+  - -1.657
+  - -1.0702
+  - -0.0113
+  scale: 0.0254
+  thermal: null
+sparkx_car_green:
+  cls: car
+  color: green
+  fuel: Hatchback red
+  hue_shift: 0.33
+  kind: vehicle
+  max:
+  - 2.3441
+  - 1.0702
+  - 1.5566
+  mesh: meshes/hatchback.obj
+  mesh_pose: *id001
+  min:
+  - -1.657
+  - -1.0702
+  - -0.0113
+  scale: 0.0254
+  thermal: null
+sparkx_car_red:
+  cls: car
+  color: red
+  fuel: Hatchback red
+  kind: vehicle
+  max:
+  - 2.3441
+  - 1.0702
+  - 1.5566
+  mesh: meshes/hatchback.obj
+  mesh_pose: *id001
+  min:
+  - -1.657
+  - -1.0702
+  - -0.0113
+  scale: 0.0254
+  thermal: null
+sparkx_car_white:
+  cls: car
+  color: white
+  fuel: Hatchback
+  kind: vehicle
+  max:
+  - 2.3441
+  - 1.0702
+  - 1.5566
+  mesh: meshes/hatchback.obj
+  mesh_pose: *id001
+  min:
+  - -1.657
+  - -1.0702
+  - -0.0113
+  scale: 0.0254
+  thermal: null
+sparkx_car_yellow:
+  cls: car
+  color: yellow
+  fuel: Hatchback red
+  hue_shift: 0.14
+  kind: vehicle
+  max:
+  - 2.3441
+  - 1.0702
+  - 1.5566
+  mesh: meshes/hatchback.obj
+  mesh_pose: *id001
+  min:
+  - -1.657
+  - -1.0702
+  - -0.0113
+  scale: 0.0254
+  thermal: null
+sparkx_dumpster:
+  cls: dumpster
+  color: green
+  fuel: Dumpster
+  kind: prop
+  max:
+  - 1.2526
+  - 0.7676
+  - 1.7719
+  mesh: meshes/dumpster.dae
+  min:
+  - -1.2526
+  - -0.7676
+  - -0.0014
+  scale: 1.5
+  thermal: null
+sparkx_fire_truck:
+  cls: fire_truck
+  color: red
+  fuel: Fire truck
+  kind: vehicle
+  max:
+  - 6.5477
+  - 1.7731
+  - 3.3518
+  mesh: meshes/fire_truck.obj
+  mesh_pose: *id001
+  min:
+  - -5.8817
+  - -1.7731
+  - -0.0033
+  scale: 0.1
+  thermal: null
+sparkx_hydrant:
+  cls: fire_hydrant
+  color: red
+  fuel: Fire hydrant
+  kind: prop
+  max:
+  - 0.2118
+  - 0.2118
+  - 0.9292
+  mesh: meshes/fire_hydrant.dae
+  min:
+  - -0.2118
+  - -0.2118
+  - -0.0021
+  thermal: null
+sparkx_jersey_barrier:
+  cls: barrier
+  color: gray
+  fuel: Jersey Barrier
+  kind: prop
+  max:
+  - 2.0328
+  - 0.4064
+  - 1.143
+  mesh: meshes/jersey_barrier.dae
+  min:
+  - -2.0328
+  - -0.4064
+  - 0.0
+  thermal: null
+sparkx_pickup:
+  cls: car
+  color: gray
+  fuel: Pickup
+  kind: vehicle
+  max:
+  - 2.7122
+  - 1.2365
+  - 1.8582
+  mesh: meshes/pickup.dae
+  mesh_pose: &id003
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - -1.5707963
+  min:
+  - -2.9525
+  - -1.2365
+  - -0.0073
+  thermal: null
+sparkx_rock:
+  collider: meshes/FallingRock01_Collider.dae
+  fuel: Falling Rock 1
+  kind: rock
+  max:
+  - 0.745
+  - 0.7408
+  - 0.6961
+  mesh: meshes/FallingRock01.dae
+  min:
+  - -0.745
+  - -0.7408
+  - -0.6961
+  thermal: null
+sparkx_ruin_firestation:
+  fuel: Collapsed Fire Station
+  kind: ruin
+  max:
+  - 13.9855
+  - 9.1419
+  - 11.4702
+  mesh: meshes/collapsed_fire_station.dae
+  min:
+  - -13.9855
+  - -9.1419
+  - -1.0227
+  thermal: null
+sparkx_ruin_house:
+  fuel: Collapsed House
+  kind: ruin
+  max:
+  - 8.0851
+  - 6.4653
+  - 5.8007
+  mesh: meshes/collapsed_house.dae
+  min:
+  - -8.0851
+  - -6.4653
+  - -0.0002
+  scale: 1.5
+  thermal: null
+sparkx_ruin_industrial:
+  fuel: Collapsed industrial building
+  kind: ruin
+  max:
+  - 12.3876
+  - 10.839
+  - 24.0449
+  mesh: meshes/collapsed_industrial.dae
+  min:
+  - -10.7342
+  - -8.8622
+  - -0.3777
+  thermal: null
+sparkx_ruin_police:
+  fuel: Collapsed police station
+  kind: ruin
+  max:
+  - 9.7959
+  - 11.0746
+  - 8.5831
+  mesh: meshes/collapsed_police_station.dae
+  min:
+  - -9.7959
+  - -11.0746
+  - -0.3053
+  thermal: null
+sparkx_survivor_female:
+  desc: adult female, casual clothes
+  fuel: Casual female
+  kind: survivor
+  max:
+  - 0.3221
+  - 0.1507
+  - 1.6718
+  mesh: meshes/casual_female.dae
+  mesh_pose: &id002
+  - 0
+  - 0
+  - 0.02
+  - 0.04
+  - 0
+  - 0
+  min:
+  - -0.2878
+  - -0.4009
+  - -0.0006
+  postures:
+  - standing
+  - lying
+  thermal:
+    temperature: 307.5
+sparkx_survivor_male:
+  desc: adult male, white t-shirt, jeans
+  fuel: Standing person
+  kind: survivor
+  max:
+  - 0.2668
+  - 0.0711
+  - 1.9263
+  mesh: meshes/standing.dae
+  mesh_pose: *id002
+  min:
+  - -0.2774
+  - -0.252
+  - 0.0082
+  postures:
+  - standing
+  - lying
+  thermal:
+    temperature: 308.5
+sparkx_survivor_medic:
+  desc: adult female, medical scrubs
+  fuel: Scrubs
+  kind: survivor
+  max:
+  - 0.1917
+  - 0.2966
+  - 1.6095
+  mesh: meshes/scrubs.obj
+  min:
+  - -0.1294
+  - -0.2607
+  - -0.0017
+  postures:
+  - standing
+  - lying
+  thermal:
+    temperature: 307.0
+sparkx_survivor_randy:
+  desc: adult manikin, hi-vis jacket
+  fuel: Rescue Randy
+  kind: survivor
+  max:
+  - 0.6818
+  - 0.1788
+  - 1.8211
+  mesh: meshes/rescue_randy.dae
+  min:
+  - -0.6818
+  - -0.1785
+  - 0.0
+  postures:
+  - standing
+  - lying
+  thermal:
+    heat_signature: materials/textures/RescueRandy_Thermal.png
+    max_temp: 310.0
+sparkx_survivor_randy_sitting:
+  desc: adult sitting, hi-vis jacket
+  fuel: Rescue Randy Sitting
+  kind: survivor
+  max:
+  - 0.2743
+  - 0.304
+  - 0.7235
+  mesh: meshes/rescue_randy.dae
+  mesh_pose:
+  - 0
+  - 0
+  - -0.624
+  - 0
+  - 0
+  - 0
+  min:
+  - -0.4729
+  - -0.7144
+  - -0.0063
+  postures:
+  - sitting
+  thermal:
+    heat_signature: materials/textures/RescueRandy_Thermal.png
+    max_temp: 308.0
+sparkx_suv:
+  cls: car
+  color: gray
+  fuel: SUV
+  kind: vehicle
+  max:
+  - 2.5768
+  - 1.3358
+  - 2.1482
+  mesh: meshes/suv.obj
+  mesh_pose: *id003
+  min:
+  - -2.4434
+  - -1.268
+  - -0.0084
+  scale: 0.06
+  thermal: null
+sparkx_traffic_barrel:
+  cls: traffic_barrel
+  color: orange
+  fuel: Construction Barrel
+  kind: prop
+  max:
+  - 0.357
+  - 0.357
+  - 1.085
+  mesh: meshes/construction_barrel.dae
+  min:
+  - -0.357
+  - -0.357
+  - 0.0
+  scale: 0.7
+  thermal: null

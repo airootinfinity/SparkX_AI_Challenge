@@ -1,0 +1,38 @@
+# /sparkx/mission/report_survivor — rescue confirmation procedure.
+#
+# A rescue is CONFIRMED when ALL of the following hold at the time of the call:
+#  1. mission state is RUNNING
+#  2. the robot has been stationary for >= stop_dwell_s
+#  3. an un-rescued survivor is within rescue_radius_m of the robot (horizontal distance)
+#  4. there is a clear line of sight between the robot and that survivor (no walls)
+#  5. estimated_position is within report_tolerance_m of the true survivor position.
+#     The referee evaluates this robot-relative (drift free): the estimate is expressed
+#     relative to the team's own map->base_link transform at the report time.
+# Rejected reports (except MISSION_NOT_RUNNING, RATE_LIMITED, INVALID_REQUEST) are penalized.
+# Report window: once conditions 3 and 4 hold, the rescue must be confirmed within
+# GetMissionInfo.report_window_s seconds (LATE_REPORT penalty otherwise, once per survivor).
+
+uint8 CONFIRMED=0
+uint8 MISSION_NOT_RUNNING=1
+uint8 NOT_STOPPED=2
+uint8 NO_SURVIVOR_IN_RANGE=3
+uint8 NO_LINE_OF_SIGHT=4
+uint8 POSITION_MISMATCH=5
+uint8 ALREADY_RESCUED=6
+uint8 RATE_LIMITED=7
+uint8 INVALID_REQUEST=8
+
+# Estimated survivor position. frame_id must be "map" (preferred) or "base_link".
+geometry_msgs/PointStamped estimated_position
+string detection_source           # e.g. "yolo+thermal"
+float32 confidence                # 0..1
+string description                # optional free text (posture, clothing, ...)
+sensor_msgs/CompressedImage evidence   # optional snapshot, stored for the judges
+---
+bool success
+uint8 result_code
+string message
+string survivor_id                # referee id of the rescued survivor (on success)
+int32 score_delta
+float32 position_error_m          # absolute error of the map-frame estimate (on success), -1 otherwise
+Hint[] hints                      # hints released by this rescue (also published on /sparkx/mission/hints)

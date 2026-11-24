@@ -1,0 +1,24 @@
+# /sparkx/mission/get_info — static mission parameters and the published hint vocabulary.
+---
+string rules_version
+string world_name
+string team_name
+float32 time_limit_s
+float32 rescue_radius_m         # max horizontal distance robot(base_link) -> survivor for a rescue
+float32 stop_dwell_s            # robot must be stationary this long before reporting
+float32 max_stop_speed_mps      # "stationary" threshold (linear); angular threshold = 2x this in rad/s
+float32 report_tolerance_m      # max error of the reported survivor position (robot-relative check)
+float32 base_zone_radius_m      # base zone is centred on the start pose (map origin)
+float32 start_heading_enu_rad   # robot yaw at start w.r.t. world ENU (+X east, +Y north)
+float32 max_linear_speed_mps    # cmd_vel limits enforced by the platform
+float32 max_angular_speed_rps
+string[] landmark_classes
+string[] colors
+string[] relations
+string[] area_types
+string marker_dictionary        # ArUco dictionary of the numbered location markers ("DICT_4X4_100"); empty = no markers
+int32 markers_total             # number of markers standing in this world
+float32 marker_tag_size_m       # side of the black tag square on a marker face
+float32 report_window_s         # once within rescue_radius_m of a survivor with a clear view, the rescue must be confirmed within this time (0 = no limit)
+float32 idle_limit_s            # longest the rover may go without moving idle_move_m (0 = no limit)
+float32 idle_move_m

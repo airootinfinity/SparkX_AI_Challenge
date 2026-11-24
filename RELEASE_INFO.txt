@@ -1,0 +1,14 @@
+SparkX Disaster Response Challenge - team release
+Stack fingerprint (seal): 48bc87d250b7dbe3
+Built: 2026-11-24T19:52Z
+
+What is here
+  README.md, sparkx_ws/    the simulation stack, referee and the four STARTER team files
+                           (same paths and commands as the lectures; start with README.md)
+  practice world           practice_small_day (the only world shipped; competition worlds are generated
+                           by the organisers with secret seeds within the published limits)
+  training_pdfs/           learning notes for parts 1-5 and the lecture examples
+  SHA256SUMS.txt           checksums of every file in this release
+
+Files a team may edit: see sparkx_ws/TEAM_FILES.txt. Everything else is sealed
+(sparkx_ws/LOCKED_MANIFEST.sha256) and checked before every scored run.
