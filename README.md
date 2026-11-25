@@ -5,7 +5,7 @@
 > (`git clone https://github.com/airootinfinity/SparkX_AI_Challenge.git SparkXRelease`); they may use
 > `python3 hosting/sparkx_host.py check <zip>` from this branch to test their own hand-in.
 
-<p align="center"><img src="sparkx_ws/src/sparkx_worlds/models/sparkx_media/brand/header_strip_dark.png" alt="IIIT Allahabad | STEMLearn.AI | Airoot | Presented at IIT Bombay Techfest" width="100%"></p>
+<p align="center"><img src="media/sparkx_cover.jpg" alt="SparkX Disaster Response Challenge, powered by STEMLearn.AI" width="100%"></p>
 
 # SparkX Disaster Response Challenge — Team Kit
 
@@ -251,3 +251,7 @@ Only the organisers' run of your zip counts. You are **disqualified on that worl
 updates merge cleanly.
 
 **Questions:** ask the organisers, or open an Issue on this repository.
+
+## Partners
+
+<p align="center"><img src="sparkx_ws/src/sparkx_worlds/models/sparkx_media/brand/header_strip_dark.png" alt="IIIT Allahabad | STEMLearn.AI | Airoot | Presented at IIT Bombay Techfest" width="100%"></p>
