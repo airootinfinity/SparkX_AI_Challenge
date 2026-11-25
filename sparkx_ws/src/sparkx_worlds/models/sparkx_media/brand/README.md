@@ -4,8 +4,9 @@
 
 The official SparkX header, supplied by the organisers. Left to right is the partner priority:
 **1 IIIT Allahabad · 2 STEMLearn.AI · 3 Airoot · 4 Presented at IIT Bombay Techfest.**
-Wherever several logos stand together they keep this order; single-partner posters are shared out by
-priority (see the table at the top of `sparkx_worlds/branding.py`).
+Wherever several logos stand together they keep this order. The single-sponsor posters at the start
+pad feature the main sponsor, **STEMLearn.AI** (all four flags and the container board); Airoot keeps the
+tent board (see the table at the top of `sparkx_worlds/branding.py`).
 
 | File | What it is |
 |---|---|
