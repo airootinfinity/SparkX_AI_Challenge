@@ -1,6 +1,6 @@
 SparkX Disaster Response Challenge - team release
-Stack fingerprint (seal): 48bc87d250b7dbe3
-Built: 2026-11-25T18:46Z
+Stack fingerprint (seal): 6e96c68e1d95ae41
+Built: 2026-11-25T19:02Z
 
 What is here
   README.md, sparkx_ws/    the simulation stack, referee and the four STARTER team files
